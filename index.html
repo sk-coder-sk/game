@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ロボコン・プログラミング</title>
+<style>
+  :root{
+    --bg:#eaf1f3;
+    --ink:#27313f;
+    --ink-soft:#6b7888;
+    --panel:#ffffff;
+    --line:#dfe7ec;
+    --floor1:#dff1ec;
+    --floor2:#cfe9e2;
+    --wall:#33415c;
+    --wall-top:#465474;
+    --goal:#ffce3d;
+    --go:#16b083;
+    --go-deep:#0e8f6e;
+    --reset:#6b7888;
+    --move:#3d7eff;
+    --loop:#ff9f1c;
+    --branch:#9b5de5;
+    --danger:#ff4d5e;
+    --display:"Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN","Yu Gothic Medium","Yu Gothic","Meiryo",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:var(--display);color:var(--ink);background:var(--bg);
+    -webkit-font-smoothing:antialiased;line-height:1.5;
+    padding:14px 12px 40px;
+  }
+  .app{max-width:760px;margin:0 auto}
+  h1{font-size:1.25rem;text-align:center;margin-bottom:2px}
+  h1 .bot{font-size:1.4rem;vertical-align:-2px}
+  .tagline{text-align:center;color:var(--ink-soft);font-size:.82rem;margin-bottom:12px}
+
+  /* ===== ステージ選択 ===== */
+  .stages{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-bottom:10px}
+  .stage-btn{
+    border:2px solid var(--line);background:#fff;border-radius:13px;padding:7px 11px;
+    font-family:inherit;font-weight:700;font-size:.82rem;color:var(--ink-soft);cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;line-height:1.2;min-width:62px;
+  }
+  .stage-btn .lv{font-size:.66rem;color:var(--ink-soft)}
+  .stage-btn.on{border-color:var(--go);background:#e7f8f2;color:var(--ink)}
+  .stage-btn.on .lv{color:var(--go-deep)}
+
+  .hint{
+    background:#fff8e6;border:2px solid #ffe6a8;border-radius:12px;
+    padding:9px 12px;font-size:.84rem;font-weight:600;margin-bottom:12px;color:#7a5a14
+  }
+  .hint b{color:#b9760a}
+
+  /* ===== ばん（迷路）===== */
+  .board-wrap{display:flex;justify-content:center;margin-bottom:10px;position:relative}
+  .board{position:relative;border-radius:16px;padding:6px;background:#bcd9d1;box-shadow:0 6px 0 #a7cabf,0 10px 22px rgba(51,65,92,.16)}
+  .grid{display:grid;gap:3px;position:relative}
+  .cell{
+    width:var(--cell);height:var(--cell);border-radius:7px;
+    background:linear-gradient(145deg,var(--floor1),var(--floor2));
+    display:flex;align-items:center;justify-content:center;
+  }
+  .cell.wall{background:linear-gradient(180deg,var(--wall-top),var(--wall));box-shadow:inset 0 -3px 0 rgba(0,0,0,.22)}
+  .cell.goal{background:linear-gradient(145deg,#ffe07a,var(--goal));box-shadow:inset 0 0 0 3px #fff4cf}
+  .cell .flag{font-size:calc(var(--cell) * .55)}
+  .robot{
+    position:absolute;left:6px;top:6px;width:var(--cell);height:var(--cell);
+    transition:transform .34s cubic-bezier(.34,.8,.4,1);will-change:transform;
+    display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:3;
+  }
+  .robot.no-anim{transition:none}
+  .robot svg{width:84%;height:84%;filter:drop-shadow(0 3px 4px rgba(0,0,0,.25))}
+
+  .banner{
+    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    border-radius:16px;z-index:5;font-weight:800;font-size:1.5rem;color:#fff;text-align:center;padding:14px;
+  }
+  .banner.show{display:flex;animation:pin .35s ease both}
+  @keyframes pin{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+  .banner.win{background:rgba(22,176,131,.92)}
+  .banner.bad{background:rgba(255,77,94,.92)}
+  .banner.warn{background:rgba(255,159,28,.94)}
+
+  /* ===== そうさボタン ===== */
+  .controls{display:flex;gap:8px;justify-content:center;margin-bottom:14px}
+  .ctrl{
+    font-family:inherit;font-weight:800;font-size:1rem;border:none;border-radius:14px;
+    padding:13px 18px;cursor:pointer;color:#fff;display:flex;align-items:center;gap:6px;
+    transition:transform .08s,box-shadow .08s;
+  }
+  .ctrl:active{transform:translateY(3px)}
+  .ctrl.run{background:var(--go);box-shadow:0 5px 0 var(--go-deep);flex:1;max-width:200px;justify-content:center}
+  .ctrl.run:active{box-shadow:0 2px 0 var(--go-deep)}
+  .ctrl.sub{background:#fff;color:var(--reset);border:2px solid var(--line);box-shadow:0 4px 0 var(--line)}
+  .ctrl.sub:active{box-shadow:0 1px 0 var(--line)}
+  .ctrl:disabled{opacity:.5;cursor:default;transform:none}
+
+  /* ===== いま追加する場所 ===== */
+  .target-bar{
+    display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:700;color:var(--ink-soft);
+    background:#eef3f6;border-radius:10px;padding:7px 10px;margin-bottom:8px;flex-wrap:wrap
+  }
+  .target-bar b{color:var(--go-deep)}
+  .target-bar button{
+    margin-left:auto;font-family:inherit;font-weight:700;font-size:.74rem;border:1.5px solid var(--line);
+    background:#fff;border-radius:8px;padding:5px 9px;cursor:pointer;color:var(--ink-soft)
+  }
+
+  /* ===== プログラム ===== */
+  .section-label{font-size:.78rem;font-weight:800;color:var(--ink-soft);margin:0 2px 6px}
+  .program{
+    background:var(--panel);border:2px solid var(--line);border-radius:16px;
+    padding:12px;min-height:96px;margin-bottom:14px
+  }
+  .empty-note{color:#aeb8c4;text-align:center;font-weight:700;padding:24px 8px;font-size:.9rem}
+
+  .block{border-radius:12px;margin:6px 0;color:#fff;font-weight:800;font-size:.92rem;overflow:hidden}
+  .block.move{background:var(--move)}
+  .block.repeat{background:var(--loop)}
+  .block.branch{background:var(--branch)}
+  .bhead{display:flex;align-items:center;gap:7px;padding:11px 10px;flex-wrap:wrap}
+  .bhead .ic{font-size:1.05rem}
+  .bctl{margin-left:auto;display:flex;gap:5px}
+  .bctl button{
+    width:30px;height:30px;border:none;border-radius:8px;background:rgba(255,255,255,.22);
+    color:#fff;font-size:.95rem;font-weight:800;cursor:pointer;display:grid;place-items:center
+  }
+  .bctl button:active{background:rgba(255,255,255,.4)}
+  .stepper{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.22);border-radius:9px;padding:2px}
+  .stepper button{width:28px;height:28px;border:none;border-radius:7px;background:rgba(255,255,255,.25);color:#fff;font-size:1.05rem;font-weight:800;cursor:pointer}
+  .stepper .n{min-width:22px;text-align:center;font-size:1rem}
+  .bcond{background:rgba(255,255,255,.22);border:none;border-radius:9px;color:#fff;font-family:inherit;font-weight:800;font-size:.86rem;padding:6px 8px}
+  .bcond option{color:#27313f}
+  .bchildren{margin:0 8px 8px;padding:8px;background:rgba(255,255,255,.16);border-radius:10px}
+  .bfoot{padding:7px 12px;font-size:.8rem;background:rgba(0,0,0,.13)}
+  .slot{
+    width:100%;border:2px dashed rgba(255,255,255,.6);background:transparent;color:#fff;
+    border-radius:9px;padding:9px;font-family:inherit;font-weight:700;font-size:.82rem;cursor:pointer;opacity:.85
+  }
+  .slot:active{background:rgba(255,255,255,.15)}
+  .block.target>.bhead,.program.target-root{outline:none}
+  .block.target{box-shadow:0 0 0 3px #27313f, 0 0 0 6px #ffd23f}
+  .program.target-root{box-shadow:0 0 0 3px #ffd23f inset}
+
+  .run-now{box-shadow:0 0 0 4px #fff, 0 0 18px 3px rgba(255,210,61,.9)!important;transform:scale(1.015)}
+
+  /* ===== パレット ===== */
+  .palette{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+  .pal{
+    font-family:inherit;font-weight:800;font-size:.92rem;color:#fff;border:none;border-radius:13px;
+    padding:14px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;justify-content:center;
+    box-shadow:0 4px 0 rgba(0,0,0,.18);transition:transform .08s,box-shadow .08s
+  }
+  .pal:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.18)}
+  .pal .ic{font-size:1.15rem}
+  .pal.move{background:var(--move)}
+  .pal.repeat{background:var(--loop);grid-column:1 / -1}
+  .pal.branch{background:var(--branch);grid-column:1 / -1}
+  .pal:disabled{opacity:.45;transform:none}
+
+  /* ===== 先生用 ===== */
+  details.teacher{background:#fff;border:2px solid var(--line);border-radius:14px;overflow:hidden}
+  details.teacher summary{cursor:pointer;font-weight:800;padding:13px 15px;color:#5a6573;list-style:none}
+  details.teacher summary::-webkit-details-marker{display:none}
+  details.teacher summary::before{content:"▸ ";color:var(--branch)}
+  details.teacher[open] summary::before{content:"▾ "}
+  details.teacher .inner{padding:0 16px 16px;font-size:.86rem;line-height:1.75;color:#5a6573}
+  details.teacher b{color:var(--go-deep)}
+  details.teacher ul{margin:4px 0 8px 20px}
+  details.teacher .map{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+  details.teacher .map span{background:#eef3f6;border-radius:8px;padding:4px 9px;font-weight:700;font-size:.8rem}
+
+  @media (min-width:720px){
+    .main{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+    .palette{grid-template-columns:1fr 1fr}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition-duration:.001s!important;animation-duration:.001s!important}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1><span class="bot">🤖</span> ロボコン・プログラミング</h1>
+  <p class="tagline">ブロックを ならべて、ロボットを ゴールまで うごかそう！</p>
+
+  <div class="stages" id="stages"></div>
+  <div class="hint" id="hint"></div>
+
+  <div class="board-wrap">
+    <div class="board" id="board">
+      <div class="grid" id="grid"></div>
+      <div class="robot no-anim" id="robot"></div>
+      <div class="banner" id="banner"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl run" id="runBtn" onclick="run()">▶ じっこう</button>
+    <button class="ctrl sub" id="resetBtn" onclick="resetRobot(true)">⟲ もどす</button>
+    <button class="ctrl sub" id="clearBtn" onclick="clearProgram()">🗑 けす</button>
+  </div>
+
+  <div class="main">
+   <div>
+    <div class="target-bar" id="targetBar">
+      <span>いま入れる場所：<b id="targetName">プログラムの さいご</b></span>
+      <button onclick="selectTarget('root')">プログラムに もどす</button>
+    </div>
+    <div class="section-label">▼ プログラム（上から じゅんに 実行）</div>
+    <div class="program" id="program"></div>
+   </div>
+
+   <div>
+    <div class="section-label">▼ ブロック（タップで ついか）</div>
+    <div class="palette" id="palette">
+      <button class="pal move"   onclick="addBlock('fwd')"><span class="ic">⬆️</span>まえに すすむ</button>
+      <button class="pal move"   onclick="addBlock('right')"><span class="ic">↻</span>みぎを むく</button>
+      <button class="pal move"   onclick="addBlock('left')"><span class="ic">↺</span>ひだりを むく</button>
+      <button class="pal move"   style="visibility:hidden"></button>
+      <button class="pal repeat" onclick="addBlock('repeat')"><span class="ic">🔁</span>くりかえす</button>
+      <button class="pal branch" onclick="addBlock('if')"><span class="ic">🔀</span>もし 〜 なら</button>
+    </div>
+   </div>
+  </div>
+
+  <details class="teacher">
+    <summary>先生用メモ（ねらい・つなぎ方）</summary>
+    <div class="inner">
+      <b>スパイラルの設計</b>：ステージを進むと、必要な概念がじゅんに増えます。
+      <div class="map">
+        <span>① 順次（じゅんじ）</span><span>② 反復（はんぷく）</span><span>③ 分岐（ぶんき）</span><span>④ 総合</span>
+      </div>
+      <ul>
+        <li><b>①順次</b>：まえ・むきを「正しい順番」で並べるだけで解ける。まず"並び＝プログラム"を体感。</li>
+        <li><b>②反復</b>：まっすぐ長い道。まえを何個も置くのは大変→「くりかえす」の便利さに気づく。</li>
+        <li><b>③分岐</b>：曲がる場所が決め打ちできない→「もし 前がカベ なら みぎをむく」で"状況に応じて動く"を学ぶ。くりかえしの中に入れるのがコツ。</li>
+        <li><b>④総合</b>：①〜③を組み合わせて長い道を攻略。</li>
+      </ul>
+      <b>実機へのつなぎ</b>：ブロック（まえに すすむ／むきを かえる）は、実際のロボットのコマンド（前進・回転）と同じ考え方です。ここで論理を身につけてから、micro:bitなどの本物に移ると、子どもがスムーズに移行できます。
+      <ul>
+        <li>うまくいかない時は「もどす」で何度でも試行錯誤。答えは一つではありません。</li>
+        <li>「くりかえす」の回数は多めでもOK（ゴールに着いたら止まります）。</li>
+        <li>ペアで「どこで間違えた？」を話し合うと、デバッグ＝振り返りの力が育ちます。</li>
+      </ul>
+      ※ このページは外部に通信しません。すべて端末内で動くので、校内ネット・オフラインでも使えます。
+    </div>
+  </details>
+</div>
+
+<script>
+/* ====== ステージ定義 ====== */
+// '.'=みち  '#'=カベ  'S'=スタート  'G'=ゴール   dir: 1=みぎむき
+var STAGES = [
+  { name:"① 順次", lv:"じゅんじ", dir:1,
+    hint:"<b>順次（じゅんばん）</b>：「まえ」と「むき」を 正しい じゅんばんで ならべて、ゴールへ！",
+    grid:["S..","##.","##G"] },
+  { name:"② 反復", lv:"はんぷく", dir:1,
+    hint:"<b>反復（くりかえし）</b>：道が ながい！「まえ」を いくつも 置くより…🔁<b>くりかえす</b>を 使ってみよう。",
+    grid:["S.....G"] },
+  { name:"③ 分岐", lv:"ぶんき", dir:1,
+    hint:"<b>分岐（もし〜なら）</b>：🔁くりかえすの中に「🔀もし 前がカベ なら みぎをむく」→「まえに すすむ」を 入れてみよう。",
+    grid:["S...#","###.#","###.#","###G#"] },
+  { name:"④ 総合", lv:"チャレンジ", dir:1,
+    hint:"<b>チャレンジ</b>：①〜③を 組み合わせて、ながい道を 攻略しよう！",
+    grid:["S.....","#####.","#####.","....G."] }
+];
+
+var DIRDELTA = [[-1,0],[0,1],[1,0],[0,-1]]; // up,right,down,left
+var DIRDEG   = [0,90,180,270];
+
+var stageIdx = 0;
+var grid, rows, cols, start, goal, robot, cell=56;
+var root = {id:"root", type:"root", children:[]};
+var selectedId = "root";
+var running=false, collided=false, won=false, stepCount=0;
+var MAXSTEPS = 400;
+var idc = 0;
+function newId(){ return "b"+(++idc); }
+
+/* ====== ステージ読み込み ====== */
+function loadStage(i){
+  if(running) return;
+  stageIdx = i;
+  var S = STAGES[i];
+  grid = S.grid.map(function(r){return r.split("");});
+  rows = grid.length; cols = grid[0].length;
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+    if(grid[r][c]==="S") start={r:r,c:c};
+    if(grid[r][c]==="G") goal={r:r,c:c};
+  }
+  document.getElementById("hint").innerHTML = S.hint;
+  buildStageButtons();
+  buildGrid();
+  resetRobot(true);
+}
+
+function buildStageButtons(){
+  var box = document.getElementById("stages");
+  box.innerHTML = "";
+  STAGES.forEach(function(s,i){
+    var b = document.createElement("button");
+    b.className = "stage-btn" + (i===stageIdx?" on":"");
+    b.innerHTML = s.name.replace(/^(\S+)\s/,'$1<br>') + '<span class="lv">'+s.lv+'</span>';
+    b.onclick = function(){ loadStage(i); };
+    box.appendChild(b);
+  });
+}
+
+/* ====== 盤面 ====== */
+function computeCell(){
+  var wrap = document.querySelector(".board-wrap");
+  var avail = Math.min(wrap.clientWidth, 640) - 24;
+  cell = Math.max(34, Math.min(64, Math.floor((avail - (cols-1)*3) / cols)));
+  document.documentElement.style.setProperty("--cell", cell+"px");
+}
+function buildGrid(){
+  computeCell();
+  var g = document.getElementById("grid");
+  g.style.gridTemplateColumns = "repeat("+cols+", var(--cell))";
+  g.innerHTML = "";
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+    var d = document.createElement("div");
+    var t = grid[r][c];
+    d.className = "cell " + (t==="#" ? "wall" : (t==="G" ? "goal" : "path"));
+    if(t==="G") d.innerHTML = '<span class="flag">🏁</span>';
+    g.appendChild(d);
+  }
+  drawRobotSvg();
+}
+function drawRobotSvg(){
+  // 上（北）を向いたロボット
+  document.getElementById("robot").innerHTML =
+   '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">'
+   +'<rect x="22" y="6" width="6" height="14" rx="3" fill="#ff7a59"/>'        // antenna
+   +'<circle cx="25" cy="6" r="5" fill="#ffce3d"/>'
+   +'<rect x="14" y="20" width="72" height="64" rx="16" fill="#3db1ff"/>'      // body
+   +'<rect x="14" y="20" width="72" height="30" rx="16" fill="#5cc1ff"/>'      // face panel
+   +'<polygon points="50,18 40,30 60,30" fill="#ffce3d"/>'                     // front arrow (up)
+   +'<circle cx="38" cy="40" r="7" fill="#fff"/><circle cx="38" cy="40" r="3.4" fill="#27313f"/>'
+   +'<circle cx="62" cy="40" r="7" fill="#fff"/><circle cx="62" cy="40" r="3.4" fill="#27313f"/>'
+   +'<rect x="34" y="62" width="32" height="9" rx="4.5" fill="#27313f"/>'      // mouth
+   +'</svg>';
+}
+function placeRobot(anim){
+  var el = document.getElementById("robot");
+  if(!anim) el.classList.add("no-anim"); else el.classList.remove("no-anim");
+  var x = robot.c*(cell+3), y = robot.r*(cell+3);
+  el.style.transform = "translate("+x+"px,"+y+"px) rotate("+DIRDEG[robot.dir]+"deg)";
+  if(!anim){ void el.offsetWidth; } // reflow so next anim works
+}
+
+/* ====== 実行ロジック ====== */
+function isWall(r,c){
+  if(r<0||c<0||r>=rows||c>=cols) return true;
+  return grid[r][c]==="#";
+}
+function frontCell(){
+  return { r:robot.r+DIRDELTA[robot.dir][0], c:robot.c+DIRDELTA[robot.dir][1] };
+}
+function onGoal(){ return robot.r===goal.r && robot.c===goal.c; }
+function delay(ms){ return new Promise(function(res){ setTimeout(res,ms); }); }
+
+async function run(){
+  if(running) return;
+  resetRobot(false);
+  if(root.children.length===0){ showBanner("ブロックを ならべてね","warn"); return; }
+  running=true; collided=false; won=false; stepCount=0;
+  setEditing(false);
+  await delay(250);
+  await execList(root.children);
+  clearHighlights();
+  if(!collided && !won){
+    if(onGoal()) winNow(); else showBanner("ゴールに とどかなかった…<br>もう一度！","warn");
+  }
+  running=false; setEditing(true);
+}
+async function execList(list){
+  for(var i=0;i<list.length;i++){
+    if(!running||collided||won) return;
+    await execNode(list[i]);
+  }
+}
+async function execNode(node){
+  if(collided||won||!running) return;
+  highlight(node.id,true);
+  if(node.type==="fwd")        await doForward();
+  else if(node.type==="right") await doTurn(1);
+  else if(node.type==="left")  await doTurn(-1);
+  else if(node.type==="repeat"){
+    for(var i=0;i<node.count;i++){
+      if(!running||collided||won) break;
+      await execList(node.children);
+    }
+  } else if(node.type==="if"){
+    if(evalCond(node.cond)) await execList(node.children);
+  }
+  highlight(node.id,false);
+}
+async function doForward(){
+  if(++stepCount>MAXSTEPS){ stopRun(); return; }
+  var f = frontCell();
+  if(isWall(f.r,f.c)){ collided=true; placeNudge(); await delay(260); showBanner("💥 カベに ぶつかった！","bad"); return; }
+  robot.r=f.r; robot.c=f.c; placeRobot(true);
+  await delay(380);
+  if(onGoal()){ won=true; winNow(); }
+}
+async function doTurn(d){
+  if(++stepCount>MAXSTEPS){ stopRun(); return; }
+  robot.dir=(robot.dir+d+4)%4; placeRobot(true);
+  await delay(320);
+}
+function placeNudge(){
+  // ぶつかった演出：少し前に出て戻る
+  var el=document.getElementById("robot");
+  var f=frontCell();
+  var x=(robot.c + (f.c-robot.c)*0.3)*(cell+3);
+  var y=(robot.r + (f.r-robot.r)*0.3)*(cell+3);
+  el.style.transform="translate("+x+"px,"+y+"px) rotate("+DIRDEG[robot.dir]+"deg)";
+  setTimeout(placeRobot.bind(null,true),200);
+}
+function evalCond(cond){
+  var f=frontCell();
+  if(cond==="wall") return isWall(f.r,f.c);
+  if(cond==="path") return !isWall(f.r,f.c);
+  if(cond==="goal") return onGoal();
+  return false;
+}
+function stopRun(){ running=false; }
+function winNow(){ won=true; showBanner("🎉 ゴール！ せいこう！","win"); }
+
+/* ====== ハイライト・バナー ====== */
+function highlight(id,on){
+  var el=document.querySelector('[data-id="'+id+'"]');
+  if(!el) return;
+  var head=el.querySelector(".bhead")||el;
+  head.classList.toggle("run-now",on);
+}
+function clearHighlights(){
+  document.querySelectorAll(".run-now").forEach(function(e){e.classList.remove("run-now");});
+}
+function showBanner(html,kind){
+  var b=document.getElementById("banner");
+  b.className="banner show "+kind; b.innerHTML=html;
+}
+function hideBanner(){ document.getElementById("banner").className="banner"; }
+
+/* ====== もどす / けす ====== */
+function resetRobot(showB){
+  running=false; collided=false; won=false;
+  robot={r:start.r,c:start.c,dir:STAGES[stageIdx].dir};
+  placeRobot(false);
+  hideBanner();
+  clearHighlights();
+  if(showB) setEditing(true);
+}
+function clearProgram(){
+  if(running) return;
+  root.children=[]; selectedId="root"; render();
+}
+
+/* ====== ブロック追加・編集 ====== */
+function containerById(id){
+  if(id==="root") return root;
+  var found=findNode(id);
+  return found && (found.node.type==="repeat"||found.node.type==="if") ? found.node : root;
+}
+function findNode(id, list, parent){
+  list = list || root.children; parent = parent || root;
+  for(var i=0;i<list.length;i++){
+    if(list[i].id===id) return {node:list[i], parent:parent, idx:i, list:list};
+    if(list[i].children){
+      var r=findNode(id, list[i].children, list[i]);
+      if(r) return r;
+    }
+  }
+  return null;
+}
+function addBlock(type){
+  if(running) return;
+  var node={id:newId(), type:type};
+  if(type==="repeat"){ node.count=4; node.children=[]; }
+  if(type==="if"){ node.cond="wall"; node.children=[]; }
+  containerById(selectedId).children.push(node);
+  // 容器を入れたら、その中を次の追加先にする
+  if(type==="repeat"||type==="if") selectedId=node.id;
+  render();
+}
+function deleteBlock(id){
+  if(running) return;
+  var f=findNode(id); if(!f) return;
+  f.list.splice(f.idx,1);
+  if(selectedId===id || (f.node.children && findIn(f.node, selectedId))) selectedId="root";
+  render();
+}
+function findIn(node, id){
+  if(!node.children) return false;
+  for(var i=0;i<node.children.length;i++){
+    if(node.children[i].id===id) return true;
+    if(findIn(node.children[i],id)) return true;
+  }
+  return false;
+}
+function moveBlock(id,dir){
+  if(running) return;
+  var f=findNode(id); if(!f) return;
+  var j=f.idx+dir;
+  if(j<0||j>=f.list.length) return;
+  var tmp=f.list[f.idx]; f.list[f.idx]=f.list[j]; f.list[j]=tmp;
+  render();
+}
+function setCount(id,delta){
+  var f=findNode(id); if(!f) return;
+  f.node.count=Math.max(1,Math.min(20,f.node.count+delta));
+  render();
+}
+function setCond(id,val){ var f=findNode(id); if(f){ f.node.cond=val; render(); } }
+function selectTarget(id){ if(running) return; selectedId=id; render(); }
+
+/* ====== 描画 ====== */
+var CONDLABEL={wall:"前が カベ",path:"前が みち",goal:"ゴールの上"};
+function render(){
+  var host=document.getElementById("program");
+  host.classList.toggle("target-root", selectedId==="root");
+  if(root.children.length===0){
+    host.innerHTML='<div class="empty-note">ここに ブロックが ならびます<br>下の ボタンを タップ！</div>';
+  } else {
+    host.innerHTML = root.children.map(renderNode).join("");
+  }
+  // 追加先の名前
+  var name="プログラムの さいご";
+  if(selectedId!=="root"){
+    var f=findNode(selectedId);
+    if(f) name = (f.node.type==="repeat"?"「🔁くりかえす」の中":"「🔀もし」の中");
+  }
+  document.getElementById("targetName").textContent=name;
+}
+function ctrlBtns(id){
+  return '<div class="bctl">'
+    +'<button onclick="moveBlock(\''+id+'\',-1)" aria-label="上へ">▲</button>'
+    +'<button onclick="moveBlock(\''+id+'\',1)" aria-label="下へ">▼</button>'
+    +'<button onclick="deleteBlock(\''+id+'\')" aria-label="けす">×</button>'
+    +'</div>';
+}
+function renderNode(node){
+  var sel = node.id===selectedId ? " target" : "";
+  if(node.type==="fwd")
+    return '<div class="block move" data-id="'+node.id+'"><div class="bhead"><span class="ic">⬆️</span>まえに すすむ'+ctrlBtns(node.id)+'</div></div>';
+  if(node.type==="right")
+    return '<div class="block move" data-id="'+node.id+'"><div class="bhead"><span class="ic">↻</span>みぎを むく'+ctrlBtns(node.id)+'</div></div>';
+  if(node.type==="left")
+    return '<div class="block move" data-id="'+node.id+'"><div class="bhead"><span class="ic">↺</span>ひだりを むく'+ctrlBtns(node.id)+'</div></div>';
+  if(node.type==="repeat")
+    return '<div class="block repeat'+sel+'" data-id="'+node.id+'">'
+      +'<div class="bhead"><span class="ic">🔁</span>くりかえす'
+      +'<span class="stepper"><button onclick="setCount(\''+node.id+'\',-1)">−</button><span class="n">'+node.count+'</span><button onclick="setCount(\''+node.id+'\',1)">＋</button></span>かい'
+      +ctrlBtns(node.id)+'</div>'
+      +'<div class="bchildren">'+ (node.children.map(renderNode).join("")) 
+      +'<button class="slot" onclick="selectTarget(\''+node.id+'\')">＋ この中に 入れる</button></div>'
+      +'<div class="bfoot">🔁 ここまで くりかえす</div></div>';
+  if(node.type==="if")
+    return '<div class="block branch'+sel+'" data-id="'+node.id+'">'
+      +'<div class="bhead"><span class="ic">🔀</span>もし '
+      +'<select class="bcond" onchange="setCond(\''+node.id+'\',this.value)">'
+        +opt("wall",node.cond)+opt("path",node.cond)+opt("goal",node.cond)
+      +'</select> なら'+ctrlBtns(node.id)+'</div>'
+      +'<div class="bchildren">'+ (node.children.map(renderNode).join(""))
+      +'<button class="slot" onclick="selectTarget(\''+node.id+'\')">＋ この中に 入れる</button></div>'
+      +'<div class="bfoot">🔀 ここまで</div></div>';
+  return "";
+}
+function opt(v,cur){ return '<option value="'+v+'"'+(v===cur?" selected":"")+'>'+CONDLABEL[v]+'</option>'; }
+
+/* ====== UI状態 ====== */
+function setEditing(on){
+  document.querySelectorAll("#palette .pal").forEach(function(b){ b.disabled=!on; });
+  document.getElementById("runBtn").disabled=!on;
+  document.getElementById("clearBtn").disabled=!on;
+  document.getElementById("runBtn").textContent = on ? "▶ じっこう" : "じっこう中…";
+}
+
+/* ====== 起動 ====== */
+var rsz;
+window.addEventListener("resize", function(){
+  clearTimeout(rsz);
+  rsz=setTimeout(function(){ buildGrid(); placeRobot(false); }, 120);
+});
+loadStage(0);
+render();
+</script>
+</body>
+</html>
