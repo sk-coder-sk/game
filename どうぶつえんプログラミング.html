@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>どうぶつえん プログラミング</title>
+<style>
+  :root{
+    --ink:#26352f; --ink-soft:#5b6b63;
+    --panel:#fbf7ee; --panel-2:#fffdf8; --line:#e4dcc9;
+    --sky-1:#bfe9f5; --sky-2:#e7f6e6; --grass:#9fcf6a; --grass-2:#7fbb53;
+    --motion:#4d8af0; --looks:#9b59d0; --sound:#e84b8a; --control:#f2a33c; --event:#36b37e;
+    --shadow:0 6px 0 rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    font-family:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN W4","Rounded Mplus 1c",
+      "Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+    color:var(--ink);
+    background:linear-gradient(160deg,#eef6e8,#e3eef7);
+    -webkit-user-select:none; user-select:none;
+    padding:10px; min-height:100vh;
+  }
+  h1,h2,h3{margin:0;}
+  .app{max-width:1000px; margin:0 auto;}
+
+  header.top{
+    display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;
+  }
+  header.top .logo{font-size:30px;}
+  header.top h1{font-size:22px; letter-spacing:.5px;}
+  header.top .sub{font-size:12px; color:var(--ink-soft); margin-left:auto;}
+
+  /* ===== ステージ ===== */
+  .stage-card{
+    background:var(--panel); border:3px solid var(--line); border-radius:22px;
+    padding:12px; box-shadow:var(--shadow); margin-bottom:12px;
+  }
+  .stage{
+    position:relative; height:300px; border-radius:16px; overflow:hidden;
+    background:
+      radial-gradient(120px 60px at 80% 20%, #fff6c8 0%, transparent 70%),
+      linear-gradient(180deg,var(--sky-1) 0%, var(--sky-2) 62%, var(--grass) 62%, var(--grass-2) 100%);
+    border:2px solid #d7e6c4;
+  }
+  .stage .cloud{position:absolute; font-size:34px; opacity:.85; top:14px;}
+  .animal{
+    position:absolute; bottom:24px; font-size:52px; line-height:1;
+    transition:transform .42s cubic-bezier(.34,1.4,.5,1); cursor:pointer;
+    transform-origin:50% 90%; will-change:transform;
+    filter:drop-shadow(0 4px 2px rgba(0,0,0,.18));
+  }
+  .animal.sel::after{
+    content:""; position:absolute; left:50%; bottom:-12px; width:54px; height:14px;
+    transform:translateX(-50%); border-radius:50%;
+    background:rgba(255,210,60,.55); box-shadow:0 0 0 4px rgba(255,210,60,.25);
+  }
+  .animal.talk{animation:talkpop .4s ease;}
+  @keyframes talkpop{0%{}40%{transform:scale(1.25)}100%{}}
+  .speech{
+    position:absolute; left:50%; top:-30px; transform:translateX(-50%); background:#fff; color:var(--ink);
+    border:2px solid var(--line); border-radius:14px; padding:2px 9px; font-size:15px; font-weight:800;
+    pointer-events:none; opacity:0; transition:opacity .15s; white-space:nowrap;
+  }
+
+  .runbar{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+  .btn{
+    border:none; border-radius:14px; padding:11px 14px; font-size:15px; font-weight:800;
+    font-family:inherit; color:#fff; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,.14);
+    transition:transform .06s, box-shadow .06s; touch-action:manipulation; min-height:46px;
+  }
+  .btn:active{transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.14);}
+  .btn.play{background:var(--event);} .btn.stop{background:#e3554b;}
+  .btn.reset{background:#7b8a99;} .btn.ghost{background:#fff; color:var(--ink); border:2px solid var(--line); box-shadow:0 4px 0 rgba(0,0,0,.06);}
+  .runbar .spacer{flex:1;}
+
+  /* ===== どうぶつタブ ===== */
+  .animals-tabs{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
+  .a-tab{
+    background:var(--panel-2); border:2px solid var(--line); border-radius:14px;
+    padding:6px 10px 6px 8px; font-size:14px; font-weight:800; color:var(--ink);
+    display:flex; align-items:center; gap:6px; cursor:pointer; min-height:46px;
+  }
+  .a-tab .em{font-size:26px;}
+  .a-tab.active{border-color:#ffce3d; background:#fffbe9; box-shadow:0 0 0 3px rgba(255,206,61,.35);}
+
+  /* ===== ビルダー ===== */
+  .builder{display:flex; gap:12px; align-items:flex-start;}
+  .palette{flex:1 1 320px;}
+  .scriptpane{flex:1 1 320px;}
+  .card{
+    background:var(--panel); border:3px solid var(--line); border-radius:22px;
+    padding:12px; box-shadow:var(--shadow);
+  }
+  .card h2{font-size:15px; margin-bottom:10px; display:flex; align-items:center; gap:6px;}
+
+  .grp{margin-bottom:12px;}
+  .grp .glabel{font-size:12px; font-weight:800; color:#fff; border-radius:8px; padding:2px 9px; display:inline-block; margin-bottom:7px;}
+  .blocks{display:flex; flex-wrap:wrap; gap:7px;}
+  .blk{
+    border:none; border-radius:12px; padding:9px 12px; font-size:14px; font-weight:800;
+    color:#fff; font-family:inherit; cursor:pointer; box-shadow:0 3px 0 rgba(0,0,0,.16);
+    transition:transform .05s; touch-action:manipulation; min-height:42px;
+  }
+  .blk:active{transform:translateY(2px);}
+  .blk .ic{margin-right:3px;}
+
+  /* スクリプト */
+  .scripthead{display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap;}
+  .scripthead .who{font-size:16px; font-weight:800; display:flex; align-items:center; gap:5px;}
+  .scripthead .who .em{font-size:26px;}
+  .tabswitch{display:flex; gap:6px; margin-left:auto;}
+  .stab{
+    border:2px solid var(--line); background:#fff; border-radius:12px; padding:7px 10px;
+    font-size:13px; font-weight:800; color:var(--ink); cursor:pointer; font-family:inherit; min-height:42px;
+  }
+  .stab.on{background:var(--event); color:#fff; border-color:var(--event);}
+  .stab.on.touch{background:#e6a32b; border-color:#e6a32b;}
+
+  .script{
+    min-height:150px; background:repeating-linear-gradient(180deg,#fffef9,#fffef9 38px,#f6f1e3 38px,#f6f1e3 39px);
+    border:2px dashed #d8cfb8; border-radius:14px; padding:8px;
+  }
+  .hat{
+    background:var(--event); color:#fff; font-weight:800; font-size:14px;
+    border-radius:12px 12px 6px 6px; padding:8px 12px; margin-bottom:6px; display:flex; align-items:center; gap:6px;
+  }
+  .hat.touch{background:#e6a32b;}
+  .row{
+    display:flex; align-items:center; gap:6px; background:#fff; border:2px solid var(--line);
+    border-radius:11px; padding:7px 8px; margin:5px 0; font-size:14px; font-weight:700;
+  }
+  .row.sel{outline:3px solid #ffce3d; outline-offset:1px;}
+  .row .dot{width:14px; height:14px; border-radius:50%; flex:0 0 auto;}
+  .row .lab{flex:1; min-width:0;}
+  .row.loopstart, .row.loopend{background:#fff4e2; border-color:#f2c98a;}
+  .row .ctrls{display:flex; gap:5px;}
+  .row .mini{
+    border:none; background:#eee; border-radius:8px; width:30px; height:30px; font-size:15px;
+    font-weight:800; cursor:pointer; font-family:inherit; color:var(--ink); line-height:1;
+  }
+  .row .mini.del{background:#ffe0dc; color:#d23b2c;}
+  .row .stepper{display:flex; align-items:center; gap:4px; margin-left:auto;}
+  .row .stepper .num{min-width:22px; text-align:center; font-weight:800;}
+  .indent1{margin-left:20px;}
+  .empty{color:#a99; font-size:13px; text-align:center; padding:24px 8px; font-weight:700;}
+  .hint{font-size:12px; color:var(--ink-soft); margin-top:8px;}
+
+  /* ツールバー */
+  .toolbar{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
+  .toolbar .btn{font-size:14px;}
+  .btn.tool{background:#fff; color:var(--ink); border:2px solid var(--line); box-shadow:0 4px 0 rgba(0,0,0,.06);}
+
+  /* モーダル */
+  .modal{position:fixed; inset:0; background:rgba(40,50,45,.5); display:none; align-items:center; justify-content:center; padding:16px; z-index:50;}
+  .modal.show{display:flex;}
+  .sheet{background:var(--panel-2); border-radius:22px; border:3px solid var(--line); padding:18px; max-width:520px; width:100%; box-shadow:0 18px 40px rgba(0,0,0,.25);}
+  .sheet h3{font-size:18px; margin-bottom:10px;}
+  .sheet p{font-size:13px; color:var(--ink-soft); line-height:1.7; margin:6px 0;}
+  textarea{width:100%; height:96px; border:2px solid var(--line); border-radius:12px; padding:10px; font-size:13px; font-family:monospace; resize:none; -webkit-user-select:text; user-select:text;}
+  .sheet .row2{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+  .teach{font-size:13px; line-height:1.85; color:var(--ink);}
+  .teach b{color:var(--event);}
+  .teach .tag{display:inline-block; background:#eef4ec; border-radius:6px; padding:1px 7px; font-weight:800; margin:0 2px;}
+
+  @media (max-width:680px){
+    .builder{flex-direction:column;}
+    .palette,.scriptpane{flex:1 1 auto; width:100%;}
+    .stage{height:240px;}
+    .animal{font-size:42px;}
+    header.top .sub{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="logo">🦁</div>
+    <h1>どうぶつえん プログラミング</h1>
+    <div class="sub">ブロックを ならべて どうぶつを うごかそう</div>
+  </header>
+
+  <!-- ステージ -->
+  <div class="stage-card">
+    <div class="stage" id="stage">
+      <div class="cloud" style="left:14%">☁️</div>
+      <div class="cloud" style="left:55%; top:30px; font-size:26px;">☁️</div>
+    </div>
+    <div class="runbar">
+      <button class="btn play" id="playBtn">▶ うごかす</button>
+      <button class="btn stop" id="stopBtn">■ とめる</button>
+      <button class="btn reset" id="resetBtn">↺ もとにもどす</button>
+      <div class="spacer"></div>
+    </div>
+    <div class="animals-tabs" id="animalTabs"></div>
+  </div>
+
+  <!-- ビルダー -->
+  <div class="builder">
+    <!-- パレット -->
+    <div class="palette">
+      <div class="card">
+        <h2>🧩 ブロック <span style="font-size:12px;color:var(--ink-soft);font-weight:700;">（タップで ついか）</span></h2>
+        <div id="palette"></div>
+      </div>
+    </div>
+
+    <!-- スクリプト -->
+    <div class="scriptpane">
+      <div class="card">
+        <div class="scripthead">
+          <div class="who"><span class="em" id="whoEmoji">🦁</span><span id="whoName">ライオン</span> の プログラム</div>
+          <div class="tabswitch">
+            <button class="stab on" id="tabStart" data-tab="start">▶ スタート</button>
+            <button class="stab touch" id="tabTouch" data-tab="touch">👆 タッチ</button>
+          </div>
+        </div>
+        <div class="script" id="script"></div>
+        <div class="hint" id="scriptHint"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ツールバー -->
+  <div class="toolbar">
+    <button class="btn tool" id="demoBtn">✨ おてほん</button>
+    <button class="btn tool" id="clearBtn">🗑 この子をクリア</button>
+    <button class="btn tool" id="codeBtn">💾 わざコード</button>
+    <button class="btn tool" id="teachBtn">👩‍🏫 先生メモ</button>
+  </div>
+
+</div>
+
+<!-- わざコード モーダル -->
+<div class="modal" id="codeModal">
+  <div class="sheet">
+    <h3>💾 わざコード（ほぞん・よみこみ）</h3>
+    <p>下のコードを コピーして とっておけば、つぎの じかんや べつの タブレットで <b>つづき</b>が できるよ。はんの 作品を 合体させることも できるね。</p>
+    <textarea id="codeArea" readonly></textarea>
+    <div class="row2">
+      <button class="btn ghost" id="copyCode">📋 コピーする</button>
+      <button class="btn play" id="loadCode">📥 よみこむ</button>
+      <button class="btn reset" id="closeCode">とじる</button>
+    </div>
+    <p style="margin-top:8px;">よみこむときは、上のらんに コードを はりつけてから「よみこむ」を おしてね。</p>
+  </div>
+</div>
+
+<!-- 先生メモ モーダル -->
+<div class="modal" id="teachModal">
+  <div class="sheet">
+    <h3>👩‍🏫 先生メモ（ねらいと使い方）</h3>
+    <div class="teach">
+      <p><b>スパイラルの位置づけ</b><br>
+      下学年の「うごき・体験」から積み上げた <span class="tag">順次</span><span class="tag">反復</span><span class="tag">分岐</span> を、
+      記号（ブロック）で形式化する段階の教材です。</p>
+      <p><b>3つの概念との対応</b><br>
+      ・<span class="tag">順次</span>＝ブロックを 上から順に ならべる<br>
+      ・<span class="tag">反復</span>＝「くりかえし」ブロック（はじめ〜おわりの間をくり返す）<br>
+      ・<span class="tag">分岐</span>＝「👆タッチ」プログラム（＝もしタッチされたら〜する）</p>
+      <p><b>共同作業の進め方</b><br>
+      6匹を班で分担し、各自が1匹を担当 → ▶で全員のプログラムが同時に動き、
+      ひとつの「どうぶつショー」になります（同一画面・通信なし）。
+      「わざコード」で端末をまたいだ保存・合体も可能です。</p>
+      <p><b>通信・安全</b><br>
+      外部通信・データ送信は一切なし。単一HTMLでオフライン動作。校内ネット環境でも安心して使えます。</p>
+    </div>
+    <div class="row2"><button class="btn reset" id="closeTeach">とじる</button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===== どうぶつ定義 ===== */
+const ANIMALS = [
+  {id:"lion",  name:"ライオン", emoji:"🦁", base:8,  say:"ガオー"},
+  {id:"ele",   name:"ぞう",     emoji:"🐘", base:24, say:"パオーン"},
+  {id:"monkey",name:"さる",     emoji:"🐵", base:40, say:"ウッキー"},
+  {id:"bird",  name:"ことり",   emoji:"🐦", base:56, say:"ピヨピヨ"},
+  {id:"frog",  name:"かえる",   emoji:"🐸", base:72, say:"ケロケロ"},
+  {id:"peng",  name:"ペンギン", emoji:"🐧", base:88, say:"クワッ"}
+];
+
+/* state */
+const state = {};
+ANIMALS.forEach(a=>{
+  state[a.id] = {
+    scripts:{start:[], touch:[]},
+    sel:{start:-1, touch:-1},
+    pose:{x:0,y:0,scale:1,rot:0},
+    el:null, speech:null, touchBusy:false
+  };
+});
+let activeId = "lion";
+let activeTab = "start";
+let running = false;
+
+/* ===== ブロック定義 ===== */
+const CAT = {
+  motion:{label:"うごき", color:"var(--motion)"},
+  looks:{label:"みため", color:"var(--looks)"},
+  sound:{label:"おと",   color:"var(--sound)"},
+  control:{label:"せいぎょ", color:"var(--control)"}
+};
+const PALETTE = {
+  motion:[
+    {type:"move",dir:"right",label:"→ すすむ"},
+    {type:"move",dir:"left", label:"← すすむ"},
+    {type:"move",dir:"up",   label:"↑ あがる"},
+    {type:"move",dir:"down", label:"↓ さがる"},
+    {type:"jump", label:"⤴ ジャンプ"},
+    {type:"spin", label:"🔄 まわる"}
+  ],
+  looks:[
+    {type:"grow",  label:"➕ おおきく"},
+    {type:"shrink",label:"➖ ちいさく"},
+    {type:"size",  label:"🔁 もとの おおきさ"}
+  ],
+  sound:[
+    {type:"cry", label:"🔊 なく"}
+  ],
+  control:[
+    {type:"wait", label:"⏳ ちょっと まつ"},
+    {type:"loop", label:"🔁 くりかえし"}
+  ]
+};
+
+/* ラベル（スクリプト表示用） */
+function blockLabel(b){
+  switch(b.type){
+    case "move": return ({right:"→ すすむ",left:"← すすむ",up:"↑ あがる",down:"↓ さがる"})[b.dir];
+    case "jump": return "⤴ ジャンプ";
+    case "spin": return "🔄 まわる";
+    case "grow": return "➕ おおきく";
+    case "shrink": return "➖ ちいさく";
+    case "size": return "🔁 もとの おおきさ";
+    case "cry": return "🔊 なく";
+    case "wait": return "⏳ ちょっと まつ";
+    case "loopStart": return "🔁 くりかえし はじめ";
+    case "loopEnd": return "🔁 くりかえし おわり";
+  }
+  return b.type;
+}
+function blockColor(b){
+  if(b.type==="move"||b.type==="jump"||b.type==="spin") return "var(--motion)";
+  if(b.type==="grow"||b.type==="shrink"||b.type==="size") return "var(--looks)";
+  if(b.type==="cry") return "var(--sound)";
+  return "var(--control)";
+}
+
+/* ===== 音（Web Audio で合成・依存ゼロ） ===== */
+let actx=null;
+function audio(){ if(!actx){ try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(actx&&actx.state==="suspended") actx.resume(); return actx; }
+function tone(freq, t0, dur, type, vol, glideTo){
+  const ac=audio(); if(!ac) return;
+  const o=ac.createOscillator(), g=ac.createGain();
+  o.type=type||"sine"; o.frequency.setValueAtTime(freq, t0);
+  if(glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t0+dur);
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(vol||0.3, t0+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0+dur+0.05);
+}
+function noise(t0,dur,vol){
+  const ac=audio(); if(!ac) return;
+  const n=Math.floor(ac.sampleRate*dur);
+  const buf=ac.createBuffer(1,n,ac.sampleRate); const d=buf.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,1.5);
+  const s=ac.createBufferSource(); s.buffer=buf;
+  const g=ac.createGain(); g.gain.value=vol||0.18;
+  const f=ac.createBiquadFilter(); f.type="bandpass"; f.frequency.value=900;
+  s.connect(f).connect(g).connect(ac.destination); s.start(t0);
+}
+function playSound(id){
+  const ac=audio(); if(!ac) return 700; const t=ac.currentTime;
+  switch(id){
+    case "lion":   tone(150,t,0.5,"sawtooth",0.32,80); noise(t,0.5,0.16); return 650;
+    case "ele":    tone(320,t,0.45,"square",0.22,560); tone(180,t,0.5,"sawtooth",0.18); return 650;
+    case "monkey": [0,0.16,0.32].forEach(o=>tone(720,t+o,0.1,"square",0.2,520)); return 600;
+    case "bird":   [0,0.12,0.24].forEach(o=>tone(1700,t+o,0.09,"sine",0.22,2400)); return 520;
+    case "frog":   [0,0.18].forEach(o=>{tone(220,t+o,0.12,"square",0.22,150); noise(t+o,0.12,0.1);}); return 520;
+    case "peng":   tone(500,t,0.18,"sawtooth",0.22,420); noise(t,0.2,0.14); return 480;
+  }
+  return 500;
+}
+
+/* ===== ステージ描画 ===== */
+const stage = document.getElementById("stage");
+function buildStage(){
+  ANIMALS.forEach(a=>{
+    const el=document.createElement("div");
+    el.className="animal"; el.textContent=a.emoji;
+    el.style.left=a.base+"%";
+    const sp=document.createElement("div");
+    sp.className="speech"; sp.textContent=a.say;
+    el.appendChild(sp);
+    el.addEventListener("click",()=>onAnimalTap(a.id));
+    stage.appendChild(el);
+    state[a.id].el=el; state[a.id].speech=sp;
+  });
+  applyAllPoses();
+}
+function applyPose(id){
+  const s=state[id]; if(!s.el) return;
+  s.el.style.transform=`translate(${s.pose.x}px,${-s.pose.y}px) scale(${s.pose.scale}) rotate(${s.pose.rot}deg)`;
+}
+function applyAllPoses(){ ANIMALS.forEach(a=>applyPose(a.id)); }
+function setSelGlow(){
+  ANIMALS.forEach(a=> state[a.id].el.classList.toggle("sel", a.id===activeId && !running));
+}
+function onAnimalTap(id){
+  if(running){ runTouch(id); return; }
+  activeId=id; activeTab="start"; refreshAll();
+}
+
+/* ===== どうぶつタブ ===== */
+const animalTabs=document.getElementById("animalTabs");
+function buildAnimalTabs(){
+  animalTabs.innerHTML="";
+  ANIMALS.forEach(a=>{
+    const b=document.createElement("button");
+    b.className="a-tab"+(a.id===activeId?" active":"");
+    b.innerHTML=`<span class="em">${a.emoji}</span>${a.name}`;
+    b.onclick=()=>{ activeId=a.id; refreshAll(); };
+    animalTabs.appendChild(b);
+  });
+}
+
+/* ===== パレット ===== */
+const paletteEl=document.getElementById("palette");
+function buildPalette(){
+  paletteEl.innerHTML="";
+  Object.keys(PALETTE).forEach(cat=>{
+    const g=document.createElement("div"); g.className="grp";
+    const lab=document.createElement("span"); lab.className="glabel";
+    lab.textContent=CAT[cat].label; lab.style.background=CAT[cat].color;
+    g.appendChild(lab);
+    const wrap=document.createElement("div"); wrap.className="blocks";
+    PALETTE[cat].forEach(def=>{
+      const btn=document.createElement("button");
+      btn.className="blk"; btn.style.background=CAT[cat].color;
+      btn.textContent=def.label;
+      btn.onclick=()=>addBlock(def);
+      wrap.appendChild(btn);
+    });
+    g.appendChild(wrap); paletteEl.appendChild(g);
+  });
+}
+
+/* ===== ブロック追加 / 削除 ===== */
+function curList(){ return state[activeId].scripts[activeTab]; }
+function curSel(){ return state[activeId].sel[activeTab]; }
+function setSel(i){ state[activeId].sel[activeTab]=i; }
+
+function addBlock(def){
+  audio();
+  const list=curList();
+  let at=curSel(); if(at<0||at>=list.length) at=list.length-1;
+  if(def.type==="loop"){
+    // くりかえし は はじめ・おわり をペアで入れて、間に入力できるようにする
+    const start={type:"loopStart",count:3}, end={type:"loopEnd"};
+    list.splice(at+1,0,start,end);
+    setSel(at+1); // はじめ を選択 → 次のブロックは間に入る
+  }else{
+    const b=Object.assign({},def);
+    list.splice(at+1,0,b);
+    setSel(at+1);
+  }
+  renderScript();
+}
+function deleteAt(i){
+  const list=curList(); const b=list[i];
+  if(b.type==="loopStart"){ const e=matchEnd(list,i); list.splice(i, e>=0?(e-i+1):1); }
+  else if(b.type==="loopEnd"){ const s=matchStart(list,i); list.splice(s>=0?s:i, s>=0?(i-s+1):1); }
+  else list.splice(i,1);
+  setSel(Math.min(curSel(), list.length-1));
+  renderScript();
+}
+function matchEnd(list,i){ let d=0; for(let k=i;k<list.length;k++){ if(list[k].type==="loopStart")d++; if(list[k].type==="loopEnd"){d--; if(d===0)return k;} } return -1; }
+function matchStart(list,i){ let d=0; for(let k=i;k>=0;k--){ if(list[k].type==="loopEnd")d++; if(list[k].type==="loopStart"){d--; if(d===0)return k;} } return -1; }
+
+/* ===== スクリプト描画 ===== */
+const scriptEl=document.getElementById("script");
+const scriptHint=document.getElementById("scriptHint");
+function renderScript(){
+  const a=ANIMALS.find(x=>x.id===activeId);
+  document.getElementById("whoEmoji").textContent=a.emoji;
+  document.getElementById("whoName").textContent=a.name;
+  document.getElementById("tabStart").classList.toggle("on",activeTab==="start");
+  document.getElementById("tabTouch").classList.toggle("on",activeTab==="touch");
+
+  scriptEl.innerHTML="";
+  const hat=document.createElement("div");
+  hat.className="hat"+(activeTab==="touch"?" touch":"");
+  hat.textContent=activeTab==="start" ? "🚩 ▶を おしたら" : "👆 タッチ されたら";
+  scriptEl.appendChild(hat);
+
+  const list=curList();
+  if(list.length===0){
+    const e=document.createElement("div"); e.className="empty";
+    e.textContent="ブロックを えらんで ならべよう！";
+    scriptEl.appendChild(e);
+  }
+  let depth=0;
+  list.forEach((b,i)=>{
+    if(b.type==="loopEnd") depth=Math.max(0,depth-1);
+    const row=document.createElement("div");
+    row.className="row"+(i===curSel()?" sel":"")+(depth>0?" indent1":"");
+    if(b.type==="loopStart") row.classList.add("loopstart");
+    if(b.type==="loopEnd") row.classList.add("loopend");
+    row.onclick=(ev)=>{ if(ev.target.closest(".mini")) return; setSel(i); renderScript(); };
+
+    const dot=document.createElement("span"); dot.className="dot"; dot.style.background=blockColor(b);
+    const lab=document.createElement("span"); lab.className="lab"; lab.textContent=blockLabel(b);
+    row.appendChild(dot); row.appendChild(lab);
+
+    if(b.type==="loopStart"){
+      const st=document.createElement("span"); st.className="stepper";
+      const minus=mini("−",()=>{ b.count=Math.max(1,b.count-1); renderScript(); });
+      const num=document.createElement("span"); num.className="num"; num.textContent=b.count+"かい";
+      const plus=mini("＋",()=>{ b.count=Math.min(10,b.count+1); renderScript(); });
+      st.appendChild(minus); st.appendChild(num); st.appendChild(plus);
+      row.appendChild(st);
+    }
+    const c=document.createElement("span"); c.className="ctrls";
+    c.appendChild(mini("✕",()=>deleteAt(i),"del"));
+    row.appendChild(c);
+
+    scriptEl.appendChild(row);
+    if(b.type==="loopStart") depth++;
+  });
+
+  scriptHint.textContent = activeTab==="start"
+    ? "ヒント：上から じゅんばんに うごくよ（順次）。「くりかえし」の あいだは くり返すよ（反復）。"
+    : "ヒント：うごかしてる ときに この子を タッチすると、ここが うごくよ（分岐）。";
+}
+function mini(t,fn,cls){ const b=document.createElement("button"); b.className="mini"+(cls?(" "+cls):""); b.textContent=t; b.onclick=(e)=>{e.stopPropagation();fn();}; return b; }
+
+/* ===== タブ切替 ===== */
+document.querySelectorAll(".stab").forEach(t=>{
+  t.onclick=()=>{ activeTab=t.dataset.tab; renderScript(); };
+});
+
+/* ===== じっこう エンジン ===== */
+const SPEED=420;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const STEP=58, MAXX=150, MAXY=120;
+
+async function doBlock(id,b){
+  if(!running) return;
+  const s=state[id], p=s.pose;
+  switch(b.type){
+    case "move":
+      if(b.dir==="right") p.x=Math.min(MAXX,p.x+STEP);
+      if(b.dir==="left")  p.x=Math.max(-MAXX,p.x-STEP);
+      if(b.dir==="up")    p.y=Math.min(MAXY,p.y+STEP);
+      if(b.dir==="down")  p.y=Math.max(0,p.y-STEP);
+      applyPose(id); await sleep(SPEED); break;
+    case "jump":{
+      const y0=p.y; p.y=y0+70; applyPose(id); await sleep(SPEED*0.55);
+      p.y=y0; applyPose(id); await sleep(SPEED*0.55); break;
+    }
+    case "spin": p.rot+=360; applyPose(id); await sleep(SPEED); break;
+    case "grow": p.scale=Math.min(2.2,p.scale*1.3); applyPose(id); await sleep(SPEED); break;
+    case "shrink": p.scale=Math.max(0.4,p.scale/1.3); applyPose(id); await sleep(SPEED); break;
+    case "size": p.scale=1; applyPose(id); await sleep(SPEED); break;
+    case "cry":{
+      const dur=playSound(id);
+      s.el.classList.add("talk"); s.speech.style.opacity="1";
+      await sleep(dur); s.el.classList.remove("talk"); s.speech.style.opacity="0"; break;
+    }
+    case "wait": await sleep(700); break;
+  }
+}
+async function runList(id,list){
+  let i=0; const loopStk=[];
+  while(i<list.length && running){
+    const b=list[i];
+    if(b.type==="loopStart"){ loopStk.push({start:i,count:b.count,iter:0}); i++; continue; }
+    if(b.type==="loopEnd"){
+      const top=loopStk[loopStk.length-1];
+      if(top){ top.iter++; if(top.iter<top.count){ i=top.start+1; continue; } else { loopStk.pop(); i++; continue; } }
+      i++; continue;
+    }
+    await doBlock(id,b); i++;
+  }
+}
+async function runTouch(id){
+  const s=state[id]; if(s.touchBusy) return;
+  s.touchBusy=true; await runList(id, s.scripts.touch); s.touchBusy=false;
+}
+
+function play(){
+  if(running) return; audio();
+  running=true; setSelGlow();
+  ANIMALS.forEach(a=> runList(a.id, state[a.id].scripts.start));
+}
+function stop(){ running=false; ANIMALS.forEach(a=>state[a.id].touchBusy=false); setSelGlow(); }
+function resetPose(){
+  stop();
+  ANIMALS.forEach(a=>{ state[a.id].pose={x:0,y:0,scale:1,rot:0}; state[a.id].speech.style.opacity="0"; state[a.id].el.classList.remove("talk"); });
+  applyAllPoses(); setSelGlow();
+}
+
+document.getElementById("playBtn").onclick=play;
+document.getElementById("stopBtn").onclick=stop;
+document.getElementById("resetBtn").onclick=resetPose;
+
+/* ===== ツール ===== */
+document.getElementById("clearBtn").onclick=()=>{
+  state[activeId].scripts[activeTab]=[]; setSel(-1); renderScript();
+};
+document.getElementById("demoBtn").onclick=loadDemo;
+function loadDemo(){
+  // すぐ遊べる おてほん（順次・反復・分岐を一通り）
+  state.lion.scripts.start=[{type:"cry"},{type:"loopStart",count:3},{type:"move",dir:"right"},{type:"jump"},{type:"loopEnd"}];
+  state.lion.scripts.touch=[{type:"spin"},{type:"cry"}];
+  state.monkey.scripts.start=[{type:"loopStart",count:4},{type:"jump"},{type:"loopEnd"},{type:"cry"}];
+  state.bird.scripts.start=[{type:"move",dir:"up"},{type:"loopStart",count:5},{type:"move",dir:"right"},{type:"cry"},{type:"loopEnd"}];
+  state.ele.scripts.touch=[{type:"grow"},{type:"cry"}];
+  state.frog.scripts.start=[{type:"loopStart",count:6},{type:"jump"},{type:"wait"},{type:"loopEnd"}];
+  ANIMALS.forEach(a=>{ state[a.id].sel.start=state[a.id].scripts.start.length-1; });
+  refreshAll();
+}
+
+/* ===== わざコード ===== */
+const codeModal=document.getElementById("codeModal");
+const codeArea=document.getElementById("codeArea");
+document.getElementById("codeBtn").onclick=()=>{ codeArea.value=encodeAll(); codeModal.classList.add("show"); };
+document.getElementById("closeCode").onclick=()=>codeModal.classList.remove("show");
+document.getElementById("copyCode").onclick=()=>{ codeArea.removeAttribute("readonly"); codeArea.select(); try{document.execCommand("copy");}catch(e){} codeArea.setAttribute("readonly","");
+  const b=document.getElementById("copyCode"); b.textContent="✅ コピーした！"; setTimeout(()=>b.textContent="📋 コピーする",1200); };
+document.getElementById("loadCode").onclick=()=>{ if(decodeAll(codeArea.value.trim())){ codeModal.classList.remove("show"); refreshAll(); } else alert("コードが よめなかったよ。もういちど コピーしなおしてね。"); };
+function encodeAll(){
+  const o={}; ANIMALS.forEach(a=>o[a.id]=state[a.id].scripts);
+  try{ return "ZOO1-"+btoa(unescape(encodeURIComponent(JSON.stringify(o)))); }catch(e){ return ""; }
+}
+function decodeAll(code){
+  try{
+    if(code.indexOf("ZOO1-")===0) code=code.slice(5);
+    const o=JSON.parse(decodeURIComponent(escape(atob(code))));
+    ANIMALS.forEach(a=>{ if(o[a.id]){ state[a.id].scripts.start=o[a.id].start||[]; state[a.id].scripts.touch=o[a.id].touch||[]; state[a.id].sel={start:-1,touch:-1}; } });
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ===== 先生メモ ===== */
+const teachModal=document.getElementById("teachModal");
+document.getElementById("teachBtn").onclick=()=>teachModal.classList.add("show");
+document.getElementById("closeTeach").onclick=()=>teachModal.classList.remove("show");
+[codeModal,teachModal].forEach(m=>m.addEventListener("click",e=>{ if(e.target===m) m.classList.remove("show"); }));
+
+/* ===== まとめ更新 ===== */
+function refreshAll(){ buildAnimalTabs(); renderScript(); setSelGlow(); }
+
+/* ===== 起動 ===== */
+buildStage(); buildPalette(); refreshAll();
+</script>
+</body>
+</html>
