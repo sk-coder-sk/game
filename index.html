@@ -116,6 +116,19 @@
   .cell.start{background:#cfe8ff}
   .cell.editable-cell{cursor:pointer}
   .cell.editable-cell:active{filter:brightness(.92)}
+  /* どうぶつモード */
+  .animal-stage{position:relative;width:300px;max-width:80vw;min-height:236px;border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center;transition:background .5s}
+  .animal-stage.t-morning{background:linear-gradient(180deg,#ffe6bd,#cfeafe)}
+  .animal-stage.t-noon{background:linear-gradient(180deg,#bfe6ff,#e9f9d9)}
+  .animal-stage.t-night{background:linear-gradient(180deg,#2b2f63,#5a4b8a)}
+  .time-badge{position:absolute;top:10px;left:10px;background:rgba(255,255,255,.85);border-radius:999px;padding:4px 13px;font-weight:800;font-size:.85rem;color:#33415c}
+  .animal-stage.t-night .time-badge{background:rgba(20,20,45,.72);color:#fff}
+  .animal-emoji{font-size:5rem;line-height:1;filter:drop-shadow(0 6px 8px rgba(0,0,0,.18))}
+  .animal-emoji.hop{animation:hop .5s}
+  @keyframes hop{0%,100%{transform:translateY(0)}30%{transform:translateY(-22px)}}
+  .action-bubble{position:absolute;top:50px;background:#fff;border-radius:14px;padding:6px 14px;font-weight:800;font-size:1rem;color:#33415c;box-shadow:0 4px 10px rgba(0,0,0,.16);opacity:0;transition:opacity .2s}
+  .action-bubble.pop{opacity:1}
+  .animal-stage.t-night .action-bubble{background:#efeefb}
   .block.target{box-shadow:0 0 0 3px #27313f,0 0 0 6px #ffd23f}
   .program.target-root{box-shadow:0 0 0 3px #ffd23f inset}
   .run-now{box-shadow:0 0 0 4px #fff,0 0 18px 3px rgba(255,210,61,.9)!important;transform:scale(1.015)}
@@ -201,6 +214,7 @@
 var MODE="maze";
 var MODES=[
   {id:"maze",ic:"🚗",name:"車（迷路）"},
+  {id:"animal",ic:"🐾",name:"どうぶつ"},
   {id:"fan", ic:"🌀",name:"せんぷうき"}
 ];
 
@@ -212,6 +226,9 @@ var STAGES=[
   {name:"④ 総合",lv:"チャレンジ",dir:1,hint:"<b>チャレンジ</b>：①〜③を 組み合わせて 攻略！ ✏️へんしゅう で めいろを 作りかえられるよ。",grid:["S.......","#######.","........",".#######",".......G"],editable:true}
 ];
 var FAN_HINT="🌀 <b>せんぷうきモード</b>：「まわす→◯びょうまつ→とめる」をならべよう。おだい例：『中で回す→はやく→3びょう→とめる』、『くりかえすで だんだん速く』。";
+var ANIMAL_HINT="🐾 <b>どうぶつモード</b>：その子の『1日の動き』を作ろう！「🕐つぎの じかんへ」で あさ→ひる→よる。「🔀もし あさ なら…」で 時間ごとに 行動を かえて、「🔁ずっと」で 1日を くりかえそう。下の <b>おてほん</b> から はじめてもOK。";
+var TIMES=["morning","noon","night"], TIMELABEL={morning:"あさ",noon:"ひる",night:"よる"}, TIMEICON={morning:"🌅",noon:"☀️",night:"🌙"};
+var dayTime="morning", animalEmoji="🐰";
 
 /* パレット定義 */
 var PALETTE={
@@ -219,6 +236,16 @@ var PALETTE={
     {t:"fwd",cls:"move",ic:"⬆️",label:"まえに すすむ"},
     {t:"right",cls:"move",ic:"↻",label:"みぎを むく"},
     {t:"left",cls:"move",ic:"↺",label:"ひだりを むく"},
+    {t:"repeat",cls:"repeat wide",ic:"🔁",label:"くりかえす"},
+    {t:"if",cls:"branch wide",ic:"🔀",label:"もし 〜 なら"}
+  ],
+  animal:[
+    {t:"aEat",cls:"move",ic:"🍴",label:"たべる"},
+    {t:"aPlay",cls:"move",ic:"🤸",label:"あそぶ"},
+    {t:"aWalk",cls:"move",ic:"🚶",label:"あるく"},
+    {t:"aDrink",cls:"move",ic:"💧",label:"みずをのむ"},
+    {t:"aSleep",cls:"stop",ic:"😴",label:"ねる"},
+    {t:"nextTime",cls:"time wide",ic:"🕐",label:"つぎの じかんへ"},
     {t:"repeat",cls:"repeat wide",ic:"🔁",label:"くりかえす"},
     {t:"if",cls:"branch wide",ic:"🔀",label:"もし 〜 なら"}
   ],
@@ -269,7 +296,7 @@ function setMode(m){
 }
 function buildStageButtons(){
   var box=document.getElementById("stages");
-  if(MODE!=="maze"){ box.style.display="none"; document.getElementById("hint").innerHTML=FAN_HINT; return; }
+  if(MODE!=="maze"){ box.style.display="none"; document.getElementById("hint").innerHTML=(MODE==="animal"?ANIMAL_HINT:FAN_HINT); return; }
   box.style.display="flex"; box.innerHTML="";
   STAGES.forEach(function(s,i){
     var b=document.createElement("button");
@@ -297,6 +324,7 @@ function buildPalette(){
 function buildStage(){
   var st=document.getElementById("stage");
   if(MODE==="maze"){ st.className="stage-box"; loadMaze(); }
+  else if(MODE==="animal"){ st.className="stage-box"; buildAnimalScene(); }
   else { st.className="stage-box"; buildFan(); }
 }
 
@@ -328,6 +356,14 @@ function loadMaze(){
 /* ===== 総合ステージ・エディタ ===== */
 function buildEditbar(){
   var bar=document.getElementById("editbar"); if(!bar)return;
+  if(MODE==="animal"){
+    bar.style.display="flex";
+    bar.innerHTML='<span class="estep">おてほん：</span>'
+      +'<button class="ebtn" onclick="loadTemplate(\'simple\')">🐣 かんたん（じゅんばん）</button>'
+      +'<button class="ebtn" onclick="loadTemplate(\'day\')">🐰 1日の動き（見本）</button>'
+      +'<button class="ebtn" onclick="loadTemplate(\'blank\')">✏️ あなあき（つづきを足す）</button>';
+    return;
+  }
   if(MODE!=="maze"||!STAGES[stageIdx].editable){ bar.innerHTML=""; bar.style.display="none"; return; }
   bar.style.display="flex";
   if(!editMode){
@@ -435,17 +471,60 @@ function updateFan(){
 }
 
 
+/* --- どうぶつ（1日の動き） --- */
+function buildAnimalScene(){
+  document.getElementById("hint").innerHTML=ANIMAL_HINT;
+  buildEditbar();
+  document.getElementById("stage").innerHTML=
+    '<div class="animal-stage t-morning" id="animalStage">'
+    +'<div class="time-badge" id="timeBadge"></div>'
+    +'<div class="animal-emoji" id="animalEmoji">'+animalEmoji+'</div>'
+    +'<div class="action-bubble" id="actionBubble"></div>'
+    +'<div class="banner" id="banner"></div></div>';
+  updateAnimal();
+}
+function updateAnimal(){
+  var stg=document.getElementById("animalStage"); if(!stg)return;
+  stg.className="animal-stage t-"+dayTime;
+  var tb=document.getElementById("timeBadge"); if(tb)tb.innerHTML=TIMEICON[dayTime]+" "+TIMELABEL[dayTime];
+}
+async function animalAct(msg){
+  var bub=document.getElementById("actionBubble"); if(bub){ bub.textContent=msg; bub.classList.add("pop"); }
+  var em=document.getElementById("animalEmoji"); if(em){ em.classList.remove("hop"); void em.offsetWidth; em.classList.add("hop"); }
+  await delay(560);
+  if(bub)bub.classList.remove("pop");
+}
+async function advanceTime(){
+  var i=TIMES.indexOf(dayTime); dayTime=TIMES[(i+1)%3]; updateAnimal(); await delay(520);
+}
+/* おてほん（1日のテンプレ） */
+function tLeaf(type){ return {id:newId(),type:type}; }
+function tIf(cond,ch,el){ return {id:newId(),type:"if",cond:cond,children:ch||[],elseChildren:el||[]}; }
+function tRep(count,ch){ return {id:newId(),type:"repeat",count:count,children:ch||[]}; }
+function loadTemplate(which){
+  if(running)return;
+  if(which==="simple"){
+    root.children=[ tLeaf("aEat"), tLeaf("nextTime"), tLeaf("aPlay"), tLeaf("nextTime"), tLeaf("aSleep") ];
+  } else if(which==="day"){
+    root.children=[ tRep(6,[ tIf("morning",[tLeaf("aEat")]), tIf("noon",[tLeaf("aPlay"),tLeaf("aDrink")]), tIf("night",[tLeaf("aSleep")]), tLeaf("nextTime") ]) ];
+  } else if(which==="blank"){
+    root.children=[ tRep(6,[ tIf("morning",[tLeaf("aEat")]), tIf("noon",[]), tIf("night",[tLeaf("aSleep")]), tLeaf("nextTime") ]) ];
+  }
+  selectedId="root"; resetStage(false); render();
+}
+
 /* ===== 実行 ===== */
 function delay(ms){ return new Promise(function(res){setTimeout(res,ms);}); }
 async function run(){
   if(running) return;
   resetStage(false);
-  if(root.children.length===0){ if(MODE==="maze")showBanner("ブロックを ならべてね","warn"); return; }
+  if(root.children.length===0){ if(MODE!=="fan")showBanner("ブロックを ならべてね","warn"); return; }
   running=true; collided=false; won=false; stepCount=0; setEditing(false);
   await delay(220);
   await execList(root.children);
   clearHighlights();
   if(MODE==="maze" && !collided && !won){ if(onGoal())winNow(); else showBanner("ゴールに とどかなかった…<br>もう一度！","warn"); }
+  else if(MODE==="animal" && !collided){ showBanner("🐾 いちにち かんりょう！ いいね！","win"); }
   running=false; setEditing(true);
 }
 async function execList(list){ for(var i=0;i<list.length;i++){ if(!running||collided||won)return; await execNode(list[i]); } }
@@ -461,6 +540,12 @@ async function execNode(node){
     case "fanSlow": fan.speed=Math.max(0,fan.speed-1); updateFan(); await delay(360); break;
     case "fanRev": fan.dir=-fan.dir; updateFan(); await delay(340); break;
     case "fanStop": fan.on=false; updateFan(); await delay(340); break;
+    case "aEat": await animalAct("🍴 もぐもぐ"); break;
+    case "aPlay": await animalAct("🤸 あそぶ！"); break;
+    case "aWalk": await animalAct("🚶 てくてく"); break;
+    case "aDrink": await animalAct("💧 ごくごく"); break;
+    case "aSleep": await animalAct("😴 すやすや"); break;
+    case "nextTime": await advanceTime(); break;
     case "wait": await delay(Math.min(2400,(node.sec||1)*650)); break;
     case "repeat": for(var i=0;i<node.count;i++){ if(!running||collided||won)break; await execList(node.children);} break;
     case "if": if(evalCond(node.cond)) await execList(node.children); else await execList(node.elseChildren||[]); break;
@@ -478,7 +563,12 @@ async function doTurn(d){
   if(++stepCount>MAXSTEPS){ running=false; return; }
   robot.dir=(robot.dir+d+4)%4; placeRobot(true); await delay(320);
 }
-function evalCond(cond){ var f=frontCell(); if(cond==="wall")return isWall(f.r,f.c); if(cond==="path")return !isWall(f.r,f.c); return onGoal(); }
+function evalCond(cond){
+  if(cond==="morning")return dayTime==="morning";
+  if(cond==="noon")return dayTime==="noon";
+  if(cond==="night")return dayTime==="night";
+  var f=frontCell(); if(cond==="wall")return isWall(f.r,f.c); if(cond==="path")return !isWall(f.r,f.c); return onGoal();
+}
 function hashGrid(){ var s=grid.map(function(r){return r.join("");}).join("|"),h=0; for(var i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;} return h.toString(36); }
 function bestKey(){ return STAGES[stageIdx].editable ? ("mz"+stageIdx+"_"+hashGrid()) : ("maze"+stageIdx); }
 function winNow(){
@@ -508,6 +598,7 @@ function hideBanner(){ var b=document.getElementById("banner"); if(b)b.className
 function resetStage(en){
   running=false; collided=false; won=false; clearHighlights();
   if(MODE==="maze"){ robot={r:start.r,c:start.c,dir:STAGES[stageIdx].dir}; placeRobot(false); hideBanner(); }
+  else if(MODE==="animal"){ dayTime="morning"; updateAnimal(); hideBanner(); }
   else { fan={speed:0,dir:1,on:false}; updateFan(); }
   if(en) setEditing(true);
 }
@@ -527,7 +618,7 @@ function addBlock(type){
   if(running) return;
   var n={id:newId(),type:type};
   if(type==="repeat"){n.count=4;n.children=[];}
-  if(type==="if"){n.cond="wall";n.children=[];n.elseChildren=[];}
+  if(type==="if"){n.cond=(MODE==="animal")?"morning":"wall";n.children=[];n.elseChildren=[];}
   if(type==="fanOn")n.speed=2;
   if(type==="wait")n.sec=2;
   
@@ -543,7 +634,7 @@ function setCond(id,val){ var f=findNode(id); if(f){f.node.cond=val; render();} 
 function selectTarget(id){ if(running)return; selectedId=id; render(); }
 
 /* 描画 */
-var CONDLABEL={wall:"前が カベ",path:"前が みち",goal:"ゴールの上"};
+var CONDLABEL={wall:"前が カベ",path:"前が みち",goal:"ゴールの上",morning:"あさ",noon:"ひる",night:"よる"};
 function render(){
   if(selectedId!=="root"){ var bId0=selectedId.split(":else")[0]; if(!findNode(bId0)) selectedId="root"; }
   var host=document.getElementById("program");
@@ -584,6 +675,12 @@ function renderNode(node){
     case "fanRev": return leaf("move",id,'<span class="ic">🔄</span>むきを かえる');
     case "fanStop":return leaf("stop",id,'<span class="ic">⏹</span>とめる');
     case "wait":  return leaf("time",id,'<span class="ic">⏱</span>'+stepperHTML(id,"sec",node.sec+"びょう",1,5)+' まつ');
+    case "aEat":   return leaf("move",id,'<span class="ic">🍴</span>たべる');
+    case "aPlay":  return leaf("move",id,'<span class="ic">🤸</span>あそぶ');
+    case "aWalk":  return leaf("move",id,'<span class="ic">🚶</span>あるく');
+    case "aDrink": return leaf("move",id,'<span class="ic">💧</span>みずをのむ');
+    case "aSleep": return leaf("stop",id,'<span class="ic">😴</span>ねる');
+    case "nextTime": return leaf("time",id,'<span class="ic">🕐</span>つぎの じかんへ');
     case "repeat":
       return '<div class="block repeat'+sel+'" data-id="'+id+'">'
         +'<div class="bhead"><span class="ic">🔁</span>くりかえす '+stepperHTML(id,"count",node.count,1,20)+'かい'+ctrlBtns(id)+'</div>'
@@ -593,7 +690,7 @@ function renderNode(node){
     case "if":
       return '<div class="block branch'+sel+'" data-id="'+id+'">'
         +'<div class="bhead"><span class="ic">🔀</span>もし <select class="bcond" onchange="setCond(\''+id+'\',this.value)">'
-        +opt("wall",node.cond)+opt("path",node.cond)+opt("goal",node.cond)+'</select> なら'+ctrlBtns(id)+'</div>'
+        +condOptions(node.cond)+'</select> なら'+ctrlBtns(id)+'</div>'
         +'<div class="bchildren">'+node.children.map(renderNode).join("")
         +'<button class="slot'+(selectedId===id?" slot-on":"")+'" onclick="selectTarget(\''+id+'\')">＋ この中（なら）に 入れる</button></div>'
         +'<div class="belse">そうでなければ</div>'
@@ -603,6 +700,7 @@ function renderNode(node){
   }
   return "";
 }
+function condOptions(cur){ var keys=(MODE==="animal")?["morning","noon","night"]:["wall","path","goal"]; return keys.map(function(k){return opt(k,cur);}).join(""); }
 function opt(v,cur){ return '<option value="'+v+'"'+(v===cur?" selected":"")+'>'+CONDLABEL[v]+'</option>'; }
 
 function setEditing(on){
