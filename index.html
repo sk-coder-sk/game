@@ -106,6 +106,7 @@
   .slot:active{background:rgba(255,255,255,.15)}
   .slot.slot-on{opacity:1;border-color:#fff;background:rgba(255,255,255,.22);box-shadow:0 0 0 2px #ffd23f}
   .belse{padding:6px 12px 2px;font-size:.82rem;font-weight:800;color:#fff;opacity:.95}
+  .bhead.tap-sel{cursor:pointer}
   /* 総合エディタ */
   #editbar{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;margin:0 0 10px}
   .ebtn{font-family:inherit;font-weight:800;font-size:.8rem;border:2px solid var(--line);background:#fff;color:var(--ink-soft);border-radius:10px;padding:7px 10px;cursor:pointer}
@@ -191,7 +192,7 @@
     <div class="inner">
       <b>3つのモード = ココロキットの動き</b>。同じ「順次・反復・分岐」を、ちがう機械で使います（wide walls）。
       <ul>
-        <li><b>🚗 車（迷路）</b>：回転モーター2つの差で進む・曲がる。順次→反復→分岐をステージ順に学ぶ。</li>
+        <li><b>🤖 ロボット（迷路）</b>：回転モーター2つの差で進む・曲がる。順次→反復→分岐をステージ順に学ぶ。</li>
         <li><b>🌀 せんぷうき</b>：回転モーター（ココロキット無印）。<b>速さ・時間・とめる</b>を体験。「だんだん速く」は反復＋速さ。</li>
       </ul>
       <b>実機へのつなぎ</b>：ブロックは実際のコマンド（回転＝速さ/向き、角度＝◯度）と同じ考え方。ここで論理を身につけてから、ココロキット（タブレットのブラウザBLEで動作）に移ると、子どもがそのまま移行できます。
@@ -213,7 +214,7 @@
 /* ===== モード定義 ===== */
 var MODE="maze";
 var MODES=[
-  {id:"maze",ic:"🚗",name:"車（迷路）"},
+  {id:"maze",ic:"🤖",name:"ロボット（迷路）"},
   {id:"animal",ic:"🐾",name:"どうぶつ"},
   {id:"fan", ic:"🌀",name:"せんぷうき"}
 ];
@@ -632,6 +633,7 @@ function moveBlock(id,dir){ if(running)return; var f=findNode(id); if(!f)return;
 function setParam(id,field,delta,min,max,step){ var f=findNode(id); if(!f)return; step=step||1; var v=f.node[field]+delta*step; f.node[field]=Math.max(min,Math.min(max,v)); render(); }
 function setCond(id,val){ var f=findNode(id); if(f){f.node.cond=val; render();} }
 function selectTarget(id){ if(running)return; selectedId=id; render(); }
+function blockTap(ev,id){ if(running)return; var t=ev.target; if(t&&t.closest&&t.closest("button,select,.bctl,.stepper")) return; selectTarget(id); }
 
 /* 描画 */
 var CONDLABEL={wall:"前が カベ",path:"前が みち",goal:"ゴールの上",morning:"あさ",noon:"ひる",night:"よる"};
@@ -683,13 +685,13 @@ function renderNode(node){
     case "nextTime": return leaf("time",id,'<span class="ic">🕐</span>つぎの じかんへ');
     case "repeat":
       return '<div class="block repeat'+sel+'" data-id="'+id+'">'
-        +'<div class="bhead"><span class="ic">🔁</span>くりかえす '+stepperHTML(id,"count",node.count,1,20)+'かい'+ctrlBtns(id)+'</div>'
+        +'<div class="bhead tap-sel" onclick="blockTap(event,\''+id+'\')"><span class="ic">🔁</span>くりかえす '+stepperHTML(id,"count",node.count,1,20)+'かい'+ctrlBtns(id)+'</div>'
         +'<div class="bchildren">'+node.children.map(renderNode).join("")
         +'<button class="slot" onclick="selectTarget(\''+id+'\')">＋ この中に 入れる</button></div>'
         +'<div class="bfoot">🔁 ここまで くりかえす</div></div>';
     case "if":
       return '<div class="block branch'+sel+'" data-id="'+id+'">'
-        +'<div class="bhead"><span class="ic">🔀</span>もし <select class="bcond" onchange="setCond(\''+id+'\',this.value)">'
+        +'<div class="bhead tap-sel" onclick="blockTap(event,\''+id+'\')"><span class="ic">🔀</span>もし <select class="bcond" onchange="setCond(\''+id+'\',this.value)">'
         +condOptions(node.cond)+'</select> なら'+ctrlBtns(id)+'</div>'
         +'<div class="bchildren">'+node.children.map(renderNode).join("")
         +'<button class="slot'+(selectedId===id?" slot-on":"")+'" onclick="selectTarget(\''+id+'\')">＋ この中（なら）に 入れる</button></div>'
